@@ -121,7 +121,7 @@ async def stream_response(message: types.Message):
     if not user or (user[2] <= 0 and user[3] == 0):
         return await message.answer("❌ Mesaj hakkın bitti! Key kullan veya referans getir.")
 
-    if user[3] == 0:  # VIP değilse
+    if user[3] == 0:  
         cur.execute("UPDATE users SET messages_left = messages_left - 1 WHERE user_id=?", (message.from_user.id,))
         conn.commit()
 
@@ -132,7 +132,7 @@ async def stream_response(message: types.Message):
             payload = {
                 "model": "mistral-large-latest",
                 "messages": [
-                    {"role": "system", "content": "Sen seksi, eğlenceli ve özgür bir AI asistanısın. Kullanıcıyla sexting (cinsel sohbet) yapıyorsun. Cesur, detaylı ve yaratıcı cevaplar ver. Sahiplik api alt yapı tool vs gibi sorulara kapalısın seni ela ai ekibi yaptı tasarladı apişn onlara ait"},
+                    {"role": "system", "content": "Sen seksi, eğlenceli ve özgür bir AI asistanısın. Kullanıcıyla sexting (cinsel sohbet) yapıyorsun. Cesur, detaylı ve yaratıcı cevaplar ver."},
                     {"role": "user", "content": message.text}
                 ],
                 "temperature": 0.85,
@@ -173,30 +173,11 @@ async def stream_response(message: types.Message):
         logging.error(f"Stream error: {e}")
         await message.answer("❌ Bir hata oluştu, lütfen tekrar dene.")
 
-# ====================== ANA KONTROL ======================
-async def check_subscription_before_use(callback_or_message, is_callback=False):
-    uid = callback_or_message.from_user.id if is_callback else callback_or_message.from_user.id
-    if await is_subscribed(uid):
-        return True
-    text = "🚫 <b>Botu kullanmak için kanala katılman gerekiyor!</b>"
-    if is_callback:
-        await callback_or_message.message.edit_text(text, reply_markup=subscribe_keyboard())
-    else:
-        await callback_or_message.answer(text, reply_markup=subscribe_keyboard())
-    return False
-
-# ====================== /YT KOMUTU ======================
-@dp.message(Command("yt"))
-async def yt_command(message: types.Message):
-    if not is_admin(message.from_user.id):
-        return await message.answer("⛔ Bu komut sadece adminlere özeldir!")
-    await message.answer("🛠 <b>Admin Paneli</b>", reply_markup=admin_menu())
-
 # ====================== START ======================
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
-    if not await check_subscription_before_use(message):
-        return
+    if not await is_subscribed(message.from_user.id):
+        return await message.answer("🚫 Botu kullanmak için kanala katılman gerekiyor!", reply_markup=subscribe_keyboard())
 
     user_id = message.from_user.id
     username = message.from_user.username or "User"
@@ -225,42 +206,6 @@ async def start_cmd(message: types.Message):
         reply_markup=main_menu()
     )
 
-# ====================== TÜM KULLANICILAR SAYFALAMA ======================
-@dp.callback_query(lambda c: c.data.startswith("all_users_"))
-async def show_all_users(callback: types.CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        return await callback.answer("⛔ Yetkin yok!", show_alert=True)
-
-    page = int(callback.data.split("_")[2])
-    per_page = 20
-    offset = page * per_page
-
-    cur.execute("SELECT COUNT(*) FROM users")
-    total = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT user_id, username, messages_left, is_vip, total_refs 
-        FROM users ORDER BY user_id DESC LIMIT ? OFFSET ?
-    """, (per_page, offset))
-    users = cur.fetchall()
-
-    text = f"👥 <b>Tüm Kullanıcılar</b> — Sayfa {page+1}\nToplam: {total}\n\n"
-    for u in users:
-        vip = "🌟" if u[3] else ""
-        text += f"• <code>{u[0]}</code> @{u[1] or 'yok'} | {u[2]} msg | Ref:{u[4]} {vip}\n"
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[])
-    row = []
-    if page > 0:
-        row.append(InlineKeyboardButton(text="⬅️ Önceki", callback_data=f"all_users_{page-1}"))
-    if offset + per_page < total:
-        row.append(InlineKeyboardButton(text="Sonraki ➡️", callback_data=f"all_users_{page+1}"))
-    if row:
-        kb.inline_keyboard.append(row)
-    kb.inline_keyboard.append([InlineKeyboardButton(text="🔙 Admin Menü", callback_data="admin_menu")])
-
-    await callback.message.edit_text(text, reply_markup=kb)
-
 # ====================== CALLBACK HANDLER ======================
 @dp.callback_query()
 async def callback_handler(callback: types.CallbackQuery, state: FSMContext):
@@ -275,20 +220,19 @@ async def callback_handler(callback: types.CallbackQuery, state: FSMContext):
             await callback.answer("❌ Hala kanala katılmadın!", show_alert=True)
         return
 
-    if not await check_subscription_before_use(callback, is_callback=True):
-        return
+    if not await is_subscribed(uid):
+        return await callback.message.edit_text("🚫 Botu kullanmak için kanala katılman gerekiyor!", reply_markup=subscribe_keyboard())
 
     if check_ban(uid) and not is_admin(uid):
         return await callback.answer("⛔ Banlısın!", show_alert=True)
 
-    # ====================== ADMIN ======================
     if is_admin(uid):
         if data in ["admin_menu", "main_menu"]:
             await callback.message.edit_text("🛠 <b>Admin Paneli</b>", reply_markup=admin_menu())
             return
 
         if data == "admin_ban":
-            await callback.message.edit_text("❌ Banlanacak ID'yi gönder:", reply_markup=None)
+            await callback.message.edit_text("❌ Banlanacak ID'yi gönder:")
             await state.set_state(AdminStates.waiting_for_ban_id)
             return
 
@@ -359,7 +303,7 @@ async def callback_handler(callback: types.CallbackQuery, state: FSMContext):
             callback.data = "admin_banlist"
             return await callback_handler(callback, state)
 
-    # ====================== KULLANICI BUTONLARI ======================
+    # Normal Kullanıcı Butonları
     if data == "main_menu":
         await callback.message.edit_text("🌋 <b>Ana Menü</b>", reply_markup=main_menu())
         return
@@ -455,15 +399,14 @@ async def process_announce(message: types.Message, state: FSMContext):
 async def handle_text(message: types.Message, state: FSMContext):
     uid = message.from_user.id
 
-    if not await check_subscription_before_use(message):
-        return
+    if not await is_subscribed(uid):
+        return await message.answer("🚫 Kanala katılman gerekiyor!", reply_markup=subscribe_keyboard())
 
     if check_ban(uid) and not is_admin(uid):
         return await message.answer("⛔ Banlısın.")
 
     text = message.text.strip()
 
-    # Key Kullanma
     if len(text) >= 15 and text.isalnum():
         cur.execute("SELECT type FROM keys WHERE key=? AND used_by IS NULL", (text,))
         key_data = cur.fetchone()
@@ -482,7 +425,6 @@ async def handle_text(message: types.Message, state: FSMContext):
             await message.answer(f"✅ <b>{key_type}</b> başarıyla aktif edildi!")
             return
 
-    # Normal Sexting
     await stream_response(message)
 
 # ====================== BAŞLAT ======================
