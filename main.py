@@ -21,7 +21,7 @@ MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 MISTRAL_KEY = "snfCmZWKmLHAhFS0KH7T4sIHRhnfs2B4"
 
 CHANNEL_USERNAME = "@elasexchat"
-ADMIN_IDS = [8064250098, 8778451157]
+ADMIN_IDS = [8230461239, 8778451157]
 
 logging.basicConfig(level=logging.INFO)
 
