@@ -121,7 +121,7 @@ async def stream_response(message: types.Message):
     if not user or (user[2] <= 0 and user[3] == 0):
         return await message.answer("❌ Mesaj hakkın bitti! Key kullan veya referans getir.")
 
-    if user[3] == 0:  
+    if user[3] == 0:
         cur.execute("UPDATE users SET messages_left = messages_left - 1 WHERE user_id=?", (message.from_user.id,))
         conn.commit()
 
@@ -172,6 +172,13 @@ async def stream_response(message: types.Message):
     except Exception as e:
         logging.error(f"Stream error: {e}")
         await message.answer("❌ Bir hata oluştu, lütfen tekrar dene.")
+
+# ====================== /YT KOMUTU ======================
+@dp.message(Command("yt"))
+async def yt_command(message: types.Message):
+    if not is_admin(message.from_user.id):
+        return await message.answer("⛔ Bu komut sadece adminlere özeldir!")
+    await message.answer("🛠 **Admin Paneli**", reply_markup=admin_menu())
 
 # ====================== START ======================
 @dp.message(Command("start"))
