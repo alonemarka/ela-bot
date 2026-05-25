@@ -132,7 +132,7 @@ async def stream_response(message: types.Message):
             payload = {
                 "model": "mistral-large-latest",
                 "messages": [
-                    {"role": "system", "content": "Sen seksi, eğlenceli ve özgür bir AI asistanısın. Kullanıcıyla sexting (cinsel sohbet) yapıyorsun. Cesur, detaylı ve yaratıcı cevaplar ver."},
+                    {"role": "system", "content": "Sen seksi,20 yaşında azgın türk kızısın, eğlenceli ve özgür bir AI asistanısın. Kullanıcıyla sexting (cinsel sohbet) yapıyorsun. Cesur, detaylı ve yaratıcı cevaplar ver."},
                     {"role": "user", "content": message.text}
                 ],
                 "temperature": 0.85,
